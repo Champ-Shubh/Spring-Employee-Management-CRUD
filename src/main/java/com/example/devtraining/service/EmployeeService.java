@@ -4,13 +4,24 @@ import com.example.devtraining.model.Department;
 import com.example.devtraining.model.Employee;
 import com.example.devtraining.repository.DepartmentRepository;
 import com.example.devtraining.repository.EmployeeRepository;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.persistence.EntityNotFoundException;
 import javax.transaction.Transactional;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +32,7 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
 
-    private final Logger logger = LogManager.getLogger(EmployeeService.class);
+    private final Logger LOGGER = LogManager.getLogger(EmployeeService.class);
 
     @Autowired
     public EmployeeService(EmployeeRepository employeeRepository, DepartmentRepository departmentRepository) {
@@ -38,7 +49,7 @@ public class EmployeeService {
         Optional<Employee> employeeByEmail = employeeRepository.findEmployeeByEmail(employee.getEmail());
 
         if (employeeByEmail.isPresent()) {
-            logger.error("Email already exists - Terminating employee creation");
+            LOGGER.error("Email already exists - Terminating employee creation");
             throw new IllegalArgumentException("Email already taken, choose a different one");
         }
 
@@ -50,10 +61,10 @@ public class EmployeeService {
         Department department = departmentRepository.findById(deptId)
                 .orElseThrow(() -> new EntityNotFoundException("Department (id - " + deptId + ") does not exist"));
 
-        logger.debug("Department exists, proceeding with assignment");
+        LOGGER.debug("Department exists, proceeding with assignment");
 
         employee.setDepartment(department);
-        logger.debug("Department assigned to employee");
+        LOGGER.debug("Department assigned to employee");
 
         addEmployee(employee);
     }
@@ -64,7 +75,7 @@ public class EmployeeService {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Employee (id - " + id + ") does not exist"));
 
-        logger.debug("Employee does exist, proceeding with updation");
+        LOGGER.debug("Employee does exist, proceeding with updation");
 
         String newName = newEmployee.getName();
         String newDesignation = newEmployee.getDesignation();
@@ -73,29 +84,29 @@ public class EmployeeService {
 
         if (newName != null && newName.length() > 0 && !Objects.equals(newName, employee.getName())) {
             employee.setName(newName);
-            logger.debug("Updating employee-" + id + ", name updated");
+            LOGGER.debug("Updating employee-" + id + ", name updated");
         }
 
         if (newDesignation != null && newDesignation.length() > 0 && !Objects.equals(newDesignation, employee.getDesignation())) {
             employee.setDesignation(newDesignation);
-            logger.debug("Updating employee-" + id + ", designation updated");
+            LOGGER.debug("Updating employee-" + id + ", designation updated");
         }
 
         if (newAge != null && newAge >= 0 && newAge < 65 && !Objects.equals(newAge, employee.getAge())) {
             employee.setAge(newAge);
-            logger.debug("Updating employee-" + id + ", age updated");
+            LOGGER.debug("Updating employee-" + id + ", age updated");
         }
 
         if (newEmail != null && newEmail.length() > 0 && !Objects.equals(newEmail, employee.getEmail())) {
             Optional<Employee> employeeByEmail = employeeRepository.findEmployeeByEmail(newEmail);
 
             if (employeeByEmail.isPresent()) {
-                logger.debug("Terminating updation of employee-" + id + ", email already exists");
+                LOGGER.debug("Terminating updation of employee-" + id + ", email already exists");
                 throw new IllegalArgumentException("Email already taken, choose a different one");
             }
 
             employee.setEmail(newEmail);
-            logger.debug("Updating employee-" + id + ", email updated");
+            LOGGER.debug("Updating employee-" + id + ", email updated");
         }
     }
 
@@ -105,11 +116,11 @@ public class EmployeeService {
         if (doesEmployeeExist)
             employeeRepository.deleteById(id);
         else {
-            logger.debug("Could not delete employee-" + id + ", Reason - Does not exist");
+            LOGGER.debug("Could not delete employee-" + id + ", Reason - Does not exist");
             throw new EntityNotFoundException("Employee (id - " + id + ") does not exist!!");
         }
 
-        logger.debug("Successfully deleted employee-" + id);
+        LOGGER.debug("Successfully deleted employee-" + id);
     }
 
     //Update employee - add department deptId to employee empId
@@ -118,14 +129,77 @@ public class EmployeeService {
         Department department = departmentRepository.findById(deptId)
                 .orElseThrow(() -> new EntityNotFoundException("Department (id - " + deptId + ") does not exist"));
 
-        logger.debug("Department exists, checking employee");
+        LOGGER.debug("Department exists, checking employee");
 
         Employee employee = employeeRepository.findById(empId)
                 .orElseThrow(() -> new EntityNotFoundException("Employee (id - " + empId + ") does not exist"));
 
-        logger.debug("Employee exists, assigning department");
+        LOGGER.debug("Employee exists, assigning department");
 
         employee.setDepartment(department);
-        logger.debug("Employee-" + empId + " assigned to department-" + deptId);
+        LOGGER.debug("Employee-" + empId + " assigned to department-" + deptId);
+    }
+
+    //Save file containing multiple employee records into DB
+    @Async
+    public void saveFile(MultipartFile file) {
+        try {
+            final long start = System.currentTimeMillis();
+
+            LOGGER.debug("Converting csv file data to list of employees");
+            List<Employee> employees = csvToEmployees(file.getInputStream());
+
+            employeeRepository.saveAll(employees);
+
+            LOGGER.debug(String.format("Total time taken to save %d records :-  %d ms ", employees.size(), (System.currentTimeMillis() - start)));
+        } catch (IOException e) {
+            LOGGER.error("IOException - File wasn't saved into database");
+            throw new RuntimeException("Couldn't save file : " + e.getMessage());
+        }
+    }
+
+    // Helper method to convert CSV file to list of Employee objects
+    private List<Employee> csvToEmployees(InputStream inputStream) {
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader("name", "email", "designation", "age", "departmentId")
+                .setSkipHeaderRecord(true)
+                .setIgnoreHeaderCase(true)
+                .setTrim(true)
+                .build();
+
+        LOGGER.debug("CSV Parser format set");
+
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+             CSVParser csvParser = new CSVParser(bufferedReader, format)
+        ) {
+            List<Employee> employees = new ArrayList<>();
+            Iterable<CSVRecord> csvRecords = csvParser.getRecords();
+
+            LOGGER.debug("CSVRecords fetched - creating objects for each and saving");
+
+            for (CSVRecord csvRecord : csvRecords) {
+                Optional<Department> department = departmentRepository.findById(
+                        Long.parseLong(csvRecord.get("DepartmentId"))
+                );
+
+                if (!department.isPresent())
+                    throw new EntityNotFoundException("Department not found");
+
+                Employee employee = new Employee(
+                        csvRecord.get("Name"),
+                        csvRecord.get("Email"),
+                        csvRecord.get("Designation"),
+                        Integer.parseInt(csvRecord.get("Age")),
+                        department.get()
+                );
+
+                employees.add(employee);
+            }
+
+            return employees;
+        } catch (IOException e) {
+            LOGGER.error("Couldn't parse CSV file : won't be proceeding further");
+            throw new RuntimeException("Failed to parse CSV file: " + e.getMessage());
+        }
     }
 }

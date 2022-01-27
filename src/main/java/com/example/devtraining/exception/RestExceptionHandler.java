@@ -8,6 +8,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import javax.persistence.EntityNotFoundException;
@@ -15,7 +16,7 @@ import javax.persistence.EntityNotFoundException;
 @ControllerAdvice
 public class RestExceptionHandler extends ResponseEntityExceptionHandler {
 
-    //Handle MissingServletRequestParameterException. Triggered when a 'required' request parameter is missing
+    // Handle MissingServletRequestParameterException. Triggered when a 'required' request parameter is missing
     @Override
     protected ResponseEntity<Object> handleMissingServletRequestParameter(
             MissingServletRequestParameterException ex,
@@ -27,7 +28,16 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponseEntity(new ApiError(HttpStatus.BAD_REQUEST, error, ex));
     }
 
-    //Handle EntityNotFoundException. Happens when requested entity is not present
+    // Handle MaxUploadSizeExceededException. Happens when uploaded file size exceeds the set limit
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    protected ResponseEntity<Object> handleMaxFileUploadException(MaxUploadSizeExceededException ex){
+        ApiError apiError = new ApiError(HttpStatus.EXPECTATION_FAILED, ex);
+        apiError.setMessage(ex.getMessage());
+
+        return buildResponseEntity(apiError);
+    }
+
+    // Handle EntityNotFoundException. Happens when requested entity is not present
     @ExceptionHandler(EntityNotFoundException.class)
     protected ResponseEntity<Object> handleEntityNotFound(EntityNotFoundException ex) {
         ApiError apiError = new ApiError(HttpStatus.NOT_FOUND, ex);
@@ -36,7 +46,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponseEntity(apiError);
     }
 
-    //Handle HttpMessageNotReadableException. Happens when request JSON is malformed
+    // Handle HttpMessageNotReadableException. Happens when request JSON is malformed
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex,
@@ -48,6 +58,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponseEntity(new ApiError(HttpStatus.BAD_REQUEST, error, ex));
     }
 
+    // Handle IllegalArgumentException. Happens due to custom validation errors
     @ExceptionHandler(IllegalArgumentException.class)
     protected ResponseEntity<Object> handleCustomValidationError(IllegalArgumentException ex) {
         ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST, ex);
@@ -56,6 +67,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponseEntity(apiError);
     }
 
+    // Helper method to return ResponseEntity object based on error data
     private ResponseEntity<Object> buildResponseEntity(ApiError apiError) {
         return new ResponseEntity<>(apiError, apiError.getStatus());
     }
