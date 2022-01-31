@@ -18,7 +18,6 @@ import javax.persistence.EntityNotFoundException;
 import javax.transaction.Transactional;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -140,26 +139,15 @@ public class EmployeeService {
         LOGGER.debug("Employee-" + empId + " assigned to department-" + deptId);
     }
 
-    //Save file containing multiple employee records into DB
+    //Save multiple employee records into DB asynchronously
     @Async
-    public void saveFile(MultipartFile file) {
-        try {
-            final long start = System.currentTimeMillis();
-
-            LOGGER.debug("Converting csv file data to list of employees");
-            List<Employee> employees = csvToEmployees(file.getInputStream());
-
-            employeeRepository.saveAll(employees);
-
-            LOGGER.debug(String.format("Total time taken to save %d records :-  %d ms ", employees.size(), (System.currentTimeMillis() - start)));
-        } catch (IOException e) {
-            LOGGER.error("IOException - File wasn't saved into database");
-            throw new RuntimeException("Couldn't save file : " + e.getMessage());
-        }
+    public void saveFile(List<Employee> employees) {
+        LOGGER.debug("Current thread :-- " + Thread.currentThread().getName() + ", allotted {} records", employees.size());
+        employeeRepository.saveAll(employees);
     }
 
     // Helper method to convert CSV file to list of Employee objects
-    private List<Employee> csvToEmployees(InputStream inputStream) {
+    public List<Employee> csvToEmployees(MultipartFile file) {
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader("name", "email", "designation", "age", "departmentId")
                 .setSkipHeaderRecord(true)
@@ -169,13 +157,15 @@ public class EmployeeService {
 
         LOGGER.debug("CSV Parser format set");
 
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        try (BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)
+        );
              CSVParser csvParser = new CSVParser(bufferedReader, format)
         ) {
             List<Employee> employees = new ArrayList<>();
             Iterable<CSVRecord> csvRecords = csvParser.getRecords();
 
-            LOGGER.debug("CSVRecords fetched - creating objects for each and saving");
+            LOGGER.debug("CSVRecords fetched");
 
             for (CSVRecord csvRecord : csvRecords) {
                 Optional<Department> department = departmentRepository.findById(
@@ -185,17 +175,23 @@ public class EmployeeService {
                 if (!department.isPresent())
                     throw new EntityNotFoundException("Department not found");
 
+                String email = csvRecord.get("Email");
+
                 Employee employee = new Employee(
                         csvRecord.get("Name"),
-                        csvRecord.get("Email"),
+                        email,
                         csvRecord.get("Designation"),
                         Integer.parseInt(csvRecord.get("Age")),
                         department.get()
                 );
 
+                if(employeeRepository.findEmployeeByEmail(email).isPresent())
+                    throw new IllegalArgumentException("Email already exists - " + email);
+
                 employees.add(employee);
             }
 
+            LOGGER.debug("List created, saving to database");
             return employees;
         } catch (IOException e) {
             LOGGER.error("Couldn't parse CSV file : won't be proceeding further");

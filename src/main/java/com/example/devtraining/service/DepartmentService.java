@@ -6,6 +6,9 @@ import com.example.devtraining.repository.DepartmentRepository;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import javax.persistence.EntityNotFoundException;
@@ -27,6 +30,14 @@ public class DepartmentService {
 
     public List<Department> getDepartments() {
         return departmentRepository.findAll();
+    }
+
+    public Department getDepartmentById(Long id){
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Department (id - " + id + ") does not exist"));
+
+        logger.debug("Department-" + id + " exists, fetching data");
+        return department;
     }
 
     public void addDepartment(Department department) {

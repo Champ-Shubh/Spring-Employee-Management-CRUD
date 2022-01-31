@@ -29,7 +29,14 @@ public class DepartmentController {
         return departmentService.getDepartments();
     }
 
+    //TODO: Update README file for this new endpoint
     @GetMapping(path = "{deptId}")
+    public Department getDepartmentById(@PathVariable("deptId") Long deptId){
+        logger.debug("Retrieving department-" + deptId);
+        return departmentService.getDepartmentById(deptId);
+    }
+
+    @GetMapping(path = "{deptId}/employees")
     public List<Employee> getEmployeesInDepartment(@PathVariable("deptId") Long deptId) {
         logger.debug("Retrieving list of all employees in department-" + deptId);
         return new ArrayList<>(departmentService.getEmployeesInDepartment(deptId));

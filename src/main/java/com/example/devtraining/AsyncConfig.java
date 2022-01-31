@@ -3,14 +3,13 @@ package com.example.devtraining;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import javax.persistence.EntityNotFoundException;
-import java.lang.reflect.Method;
+import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
@@ -18,7 +17,8 @@ public class AsyncConfig implements AsyncConfigurer {
 
     private final Logger logger = LogManager.getLogger(AsyncConfig.class);
 
-    private TaskExecutor taskExecutor() {
+    @Bean(name = "taskExecutor")
+    public Executor taskExecutor() {
         logger.debug("Creating Async Task Executor");
         final ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
 
@@ -26,7 +26,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(10);
         executor.setQueueCapacity(20);
 
-        executor.setThreadNamePrefix("employeeThread-");
+        executor.setThreadNamePrefix("workerThread-");
         executor.initialize();
 
         return executor;
@@ -34,7 +34,7 @@ public class AsyncConfig implements AsyncConfigurer {
 
     // Handler for exceptions thrown in Async methods
     @Override
-    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler(){
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
         return (ex, method, params) -> {
             logger.error("Exception occurred in some Async method - " + ex.getMessage());
         };

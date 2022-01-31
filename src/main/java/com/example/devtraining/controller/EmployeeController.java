@@ -78,8 +78,16 @@ public class EmployeeController {
     public void uploadFile(@RequestBody MultipartFile file) {
         logger.debug("Initialising file upload");
 
-        if (Objects.equals(file.getContentType(), "text/csv"))
-            employeeService.saveFile(file);
+        if (Objects.equals(file.getContentType(), "text/csv")) {
+            logger.debug("Converting csv file data to list of employees");
+            List<Employee> employees = employeeService.csvToEmployees(file);
+
+            //Take groups of 10-10 records from the list and save to DB
+            for (int i = 0; i < employees.size(); i += 10) {
+                List<Employee> list = employees.subList(i, Math.min(employees.size(), i + 10));
+                employeeService.saveFile(list);
+            }
+        }
         else {
             logger.error("Terminating file upload - File format not supported");
             throw new IllegalArgumentException("File isn't in CSV format");

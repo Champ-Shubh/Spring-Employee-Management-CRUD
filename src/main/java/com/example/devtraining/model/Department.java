@@ -1,14 +1,18 @@
 package com.example.devtraining.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.springframework.data.redis.core.RedisHash;
 
 import javax.persistence.*;
+import java.io.Serializable;
 import java.util.Objects;
 import java.util.Set;
 
 @Entity
 @Table(name = "department")
-public class Department {
+public class Department implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
