@@ -1,5 +1,11 @@
 # Employee/Department Management System (using Sprint Boot)
 
+## Features
+   * Basic CRUD APIs with MySQL as the database
+   * API to upload CSV file containing hundreds of records
+   * Redis as caching mechanism
+   * JUnit tests for each controller, service and repository class
+
 ## Entities
 * Employee
     * name
