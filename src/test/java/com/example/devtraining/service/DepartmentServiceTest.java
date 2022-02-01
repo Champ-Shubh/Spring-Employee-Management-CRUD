@@ -2,6 +2,7 @@ package com.example.devtraining.service;
 
 import com.example.devtraining.model.Department;
 import com.example.devtraining.model.Employee;
+import com.example.devtraining.repository.DepartmentRedisRepository;
 import com.example.devtraining.repository.DepartmentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +20,9 @@ class DepartmentServiceTest {
 
     @Mock
     DepartmentRepository repository;
+
+    @Mock
+    DepartmentRedisRepository redisRepository;
 
     @InjectMocks
     private DepartmentService departmentService;
@@ -48,7 +52,7 @@ class DepartmentServiceTest {
                 "test-code"
         );
 
-        Mockito.when(repository.findById(1L)).thenReturn(Optional.of(dept));
+        Mockito.when(redisRepository.getDepartmentById(1L)).thenReturn(dept);
 
         Department actualDept = departmentService.getDepartmentById(1L);
         assertEquals(actualDept, dept);

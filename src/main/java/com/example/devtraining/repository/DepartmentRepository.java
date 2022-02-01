@@ -11,7 +11,7 @@ import java.util.Optional;
 public interface DepartmentRepository extends JpaRepository<Department, Long> {
 
     /*
-    Uncomment this in case you want to add UNIQUE constraint to departmentCode column in Department
+    Uncomment this for use in the case you want to add UNIQUE constraint to departmentCode column in Department
 
     @Query(value = "SELECT * FROM Department d WHERE d.department_code = :deptCode", nativeQuery = true)
     Optional<Department> findDepartmentByDepartmentCode(String deptCode);
