@@ -29,7 +29,6 @@ public class DepartmentController {
         return departmentService.getDepartments();
     }
 
-    //TODO: Update README file for this new endpoint
     @GetMapping(path = "{deptId}")
     public Department getDepartmentById(@PathVariable("deptId") Long deptId){
         logger.debug("Retrieving department-" + deptId);
