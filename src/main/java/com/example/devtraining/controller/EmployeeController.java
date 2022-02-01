@@ -5,16 +5,18 @@ import com.example.devtraining.service.EmployeeService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping(path = "api/v1/employee")
 public class EmployeeController {
 
     private final EmployeeService employeeService;
-
     private final Logger logger = LogManager.getLogger(EmployeeController.class);
 
     @Autowired
@@ -70,5 +72,25 @@ public class EmployeeController {
 
         employeeService.assignDepartment(employeeId, departmentId);
         logger.debug("Successfully assigned employee-" + employeeId + " to department-" + departmentId);
+    }
+
+    @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public void uploadFile(@RequestBody MultipartFile file) {
+        logger.debug("Initialising file upload");
+
+        if (Objects.equals(file.getContentType(), "text/csv")) {
+            logger.debug("Converting csv file data to list of employees");
+            List<Employee> employees = employeeService.csvToEmployees(file);
+
+            //Take groups of 10-10 records from the list and save to DB
+            for (int i = 0; i < employees.size(); i += 10) {
+                List<Employee> list = employees.subList(i, Math.min(employees.size(), i + 10));
+                employeeService.saveFile(list);
+            }
+        }
+        else {
+            logger.error("Terminating file upload - File format not supported");
+            throw new IllegalArgumentException("File isn't in CSV format");
+        }
     }
 }
